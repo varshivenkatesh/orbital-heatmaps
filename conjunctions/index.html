@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satellite Conjunction Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            color: white;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .main-view {
+            flex: 1;
+            position: relative;
+        }
+
+        .view-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.8);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .view-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        #mapView, #globeView {
+            width: 100%;
+            height: 100%;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .stats {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .conjunction-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            border-left: 4px solid;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .conjunction-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .high-risk {
+            border-left-color: #ff4757;
+        }
+
+        .medium-risk {
+            border-left-color: #ffa726;
+        }
+
+        .low-risk {
+            border-left-color: #66bb6a;
+        }
+
+        .conjunction-header {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .conjunction-details {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .filter-section {
+            margin-bottom: 20px;
+        }
+
+        .filter-section h3 {
+            margin-bottom: 10px;
+            color: #64b5f6;
+        }
+
+        .filter-input {
+            width: 100%;
+            padding: 8px;
+            border: none;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            margin-bottom: 10px;
+        }
+
+        .filter-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .risk-filter {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+
+        .risk-button {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: background 0.3s;
+        }
+
+        .risk-button.active {
+            background: #2196f3;
+        }
+
+        .risk-button:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 1000;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #2196f3;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #ff4757;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .tooltip {
+            background: rgba(0, 0, 0, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            max-width: 250px;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #64b5f6;
+            font-size: 24px;
+        }
+
+        h2 {
+            color: #64b5f6;
+            font-size: 18px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>🛰️ Conjunctions</h1>
+            
+            <div class="stats" id="stats">
+                <h2>Statistics</h2>
+                <div class="stat-item">
+                    <span>Total Conjunctions:</span>
+                    <span id="totalCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>High Risk (>0.001):</span>
+                    <span id="highRiskCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Medium Risk (>0.0001):</span>
+                    <span id="mediumRiskCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Low Risk:</span>
+                    <span id="lowRiskCount">0</span>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>🔍 Filters</h3>
+                <input type="text" class="filter-input" id="searchInput" placeholder="Search satellites...">
+                
+                <div class="risk-filter">
+                    <button class="risk-button active" data-filter="all">All</button>
+                    <button class="risk-button" data-filter="high">High Risk</button>
+                    <button class="risk-button" data-filter="medium">Medium Risk</button>
+                    <button class="risk-button" data-filter="low">Low Risk</button>
+                </div>
+            </div>
+
+            <div id="conjunctionsList"></div>
+        </div>
+
+        <div class="main-view">
+            <button class="view-toggle" onclick="toggleView()">
+                <span id="viewToggleText">Switch to 3D Globe</span>
+            </button>
+            
+            <div id="mapView"></div>
+            <div id="globeView" class="hidden"></div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>Loading conjunction data...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let map;
+        let globe;
+        let conjunctionData = [];
+        let filteredData = [];
+        let markers = [];
+        let currentView = 'map';
+        let selectedConjunction = null;
+
+        // Initialize map
+        function initMap() {
+            map = L.map('mapView', {
+                center: [0, 0],
+                zoom: 2,
+                preferCanvas: true
+            });
+
+            // Add different base layers
+            const satellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri'
+            });
+
+            const dark = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+            });
+
+            satellite.addTo(map);
+
+            // Add layer control
+            L.control.layers({
+                'Satellite': satellite,
+                'Dark': dark
+            }).addTo(map);
+        }
+
+        // Initialize 3D globe
+        function initGlobe() {
+            const container = document.getElementById('globeView');
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setClearColor(0x000011);
+            container.appendChild(renderer.domElement);
+
+            // Create Earth sphere
+            const earthGeometry = new THREE.SphereGeometry(5, 64, 64);
+            const earthTexture = new THREE.TextureLoader().load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
+            const earthMaterial = new THREE.MeshPhongMaterial({ map: earthTexture });
+            const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+            scene.add(earth);
+
+            // Add lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(5, 3, 5);
+            scene.add(directionalLight);
+
+            // Position camera
+            camera.position.z = 15;
+
+            // Add controls for interaction
+            let mouseX = 0, mouseY = 0;
+            let isMouseDown = false;
+
+            container.addEventListener('mousedown', () => isMouseDown = true);
+            container.addEventListener('mouseup', () => isMouseDown = false);
+            container.addEventListener('mousemove', (event) => {
+                if (isMouseDown) {
+                    mouseX = (event.clientX / container.clientWidth) * 2 - 1;
+                    mouseY = -(event.clientY / container.clientHeight) * 2 + 1;
+                    earth.rotation.y += mouseX * 0.01;
+                    earth.rotation.x += mouseY * 0.01;
+                }
+            });
+
+            // Zoom with mouse wheel
+            container.addEventListener('wheel', (event) => {
+                camera.position.z += event.deltaY * 0.01;
+                camera.position.z = Math.max(8, Math.min(25, camera.position.z));
+            });
+
+            // Animation loop
+            function animate() {
+                requestAnimationFrame(animate);
+                earth.rotation.y += 0.001; // Slow rotation
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            globe = { scene, camera, renderer, earth, container };
+        }
+
+        // Toggle between map and globe views
+        function toggleView() {
+            const mapView = document.getElementById('mapView');
+            const globeView = document.getElementById('globeView');
+            const toggleText = document.getElementById('viewToggleText');
+
+            if (currentView === 'map') {
+                mapView.classList.add('hidden');
+                globeView.classList.remove('hidden');
+                toggleText.textContent = 'Switch to 2D Map';
+                currentView = 'globe';
+                if (!globe) initGlobe();
+                updateGlobeMarkers();
+            } else {
+                globeView.classList.add('hidden');
+                mapView.classList.remove('hidden');
+                toggleText.textContent = 'Switch to 3D Globe';
+                currentView = 'map';
+                updateMapMarkers();
+            }
+        }
+
+        // Load sample conjunction data (replace with your actual data loading)
+        function loadConjunctionData() {
+            // This would normally load your conjunctions.geojson file
+            // For demo purposes, using sample data
+            conjunctionData = [
+                {
+                    properties: {
+                        name: "Conjunction 28485-58534",
+                        tca: "2025-06-01T00:07:50.000000Z",
+                        collision_probability: 0.0001,
+                        satellite1_id: "28485",
+                        satellite2_id: "58534",
+                        altitude_km: 550,
+                        satellite1_position: { lat: 45.5, lon: -122.7, alt_km: 548 },
+                        satellite2_position: { lat: 45.6, lon: -122.8, alt_km: 552 }
+                    },
+                    geometry: {
+                        coordinates: [-122.75, 45.55, 550000]
+                    }
+                },
+                // Add more sample data here...
+            ];
+
+            // Try to load actual GeoJSON file if it exists
+            fetch('conjunctions.geojson')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.features) {
+                        conjunctionData = data.features;
+                        processConjunctionData();
+                    }
+                })
+                .catch(() => {
+                    // Use sample data if file doesn't exist
+                    processConjunctionData();
+                });
+        }
+
+        // Process and display conjunction data
+        function processConjunctionData() {
+            document.getElementById('loading').style.display = 'none';
+            
+            // Calculate statistics
+            let highRisk = 0, mediumRisk = 0, lowRisk = 0;
+            
+            conjunctionData.forEach(conj => {
+                const prob = conj.properties.collision_probability || 0;
+                if (prob > 0.001) highRisk++;
+                else if (prob > 0.0001) mediumRisk++;
+                else lowRisk++;
+            });
+
+            document.getElementById('totalCount').textContent = conjunctionData.length;
+            document.getElementById('highRiskCount').textContent = highRisk;
+            document.getElementById('mediumRiskCount').textContent = mediumRisk;
+            document.getElementById('lowRiskCount').textContent = lowRisk;
+
+            // Apply initial filter
+            applyFilters();
+        }
+
+        // Apply filters to conjunction data
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const activeFilter = document.querySelector('.risk-button.active').dataset.filter;
+
+            filteredData = conjunctionData.filter(conj => {
+                // Text search
+                const searchMatch = !searchTerm || 
+                    conj.properties.name.toLowerCase().includes(searchTerm) ||
+                    conj.properties.satellite1_id.includes(searchTerm) ||
+                    conj.properties.satellite2_id.includes(searchTerm);
+
+                // Risk filter
+                const prob = conj.properties.collision_probability || 0;
+                let riskMatch = true;
+                
+                if (activeFilter === 'high') riskMatch = prob > 0.001;
+                else if (activeFilter === 'medium') riskMatch = prob > 0.0001 && prob <= 0.001;
+                else if (activeFilter === 'low') riskMatch = prob <= 0.0001;
+
+                return searchMatch && riskMatch;
+            });
+
+            updateConjunctionsList();
+            updateMapMarkers();
+            if (currentView === 'globe') updateGlobeMarkers();
+        }
+
+        // Update conjunctions list in sidebar
+        function updateConjunctionsList() {
+            const list = document.getElementById('conjunctionsList');
+            list.innerHTML = '';
+
+            filteredData.forEach((conj, index) => {
+                const item = document.createElement('div');
+                const prob = conj.properties.collision_probability || 0;
+                
+                let riskClass = 'low-risk';
+                if (prob > 0.001) riskClass = 'high-risk';
+                else if (prob > 0.0001) riskClass = 'medium-risk';
+
+                item.className = `conjunction-item ${riskClass}`;
+                item.innerHTML = `
+                    <div class="conjunction-header">
+                        ${conj.properties.satellite1_id} ↔ ${conj.properties.satellite2_id}
+                    </div>
+                    <div class="conjunction-details">
+                        Risk: ${(prob * 1000000).toFixed(1)}/million<br>
+                        Alt: ${conj.properties.altitude_km}km<br>
+                        TCA: ${new Date(conj.properties.tca).toLocaleDateString()}
+                    </div>
+                `;
+
+                item.addEventListener('click', () => {
+                    selectConjunction(conj, index);
+                });
+
+                list.appendChild(item);
+            });
+        }
+
+        // Update map markers
+        function updateMapMarkers() {
+            // Clear existing markers
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+
+            filteredData.forEach(conj => {
+                const coords = conj.geometry.coordinates;
+                const lat = coords[1];
+                const lng = coords[0];
+                const prob = conj.properties.collision_probability || 0;
+
+                // Determine marker color and size based on risk
+                let color = '#66bb6a';
+                let radius = 8;
+                if (prob > 0.001) {
+                    color = '#ff4757';
+                    radius = 12;
+                } else if (prob > 0.0001) {
+                    color = '#ffa726';
+                    radius = 10;
+                }
+
+                const marker = L.circleMarker([lat, lng], {
+                    radius: radius,
+                    fillColor: color,
+                    color: 'white',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                });
+
+                // Add popup with conjunction details
+                const popupContent = `
+                    <div class="tooltip">
+                        <strong>${conj.properties.name}</strong><br>
+                        <strong>Risk:</strong> ${(prob * 1000000).toFixed(3)}/million<br>
+                        <strong>Altitude:</strong> ${conj.properties.altitude_km}km<br>
+                        <strong>TCA:</strong> ${new Date(conj.properties.tca).toLocaleString()}<br>
+                        <strong>Satellites:</strong> ${conj.properties.satellite1_id} & ${conj.properties.satellite2_id}
+                    </div>
+                `;
+
+                marker.bindPopup(popupContent);
+                marker.addTo(map);
+                markers.push(marker);
+            });
+        }
+
+        // Update globe markers (simplified for 3D view)
+        function updateGlobeMarkers() {
+            if (!globe) return;
+
+            // Remove existing markers (simplified - in a full implementation, track and remove properly)
+            // Add markers as small spheres on the globe surface
+            filteredData.forEach(conj => {
+                const coords = conj.geometry.coordinates;
+                const lat = coords[1] * Math.PI / 180;
+                const lng = coords[0] * Math.PI / 180;
+                const prob = conj.properties.collision_probability || 0;
+
+                // Convert lat/lng to 3D coordinates on sphere surface
+                const radius = 5.1; // Slightly above Earth surface
+                const x = radius * Math.cos(lat) * Math.cos(lng);
+                const y = radius * Math.sin(lat);
+                const z = radius * Math.cos(lat) * Math.sin(lng);
+
+                // Create marker geometry
+                const markerGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+                let markerColor = 0x66bb6a;
+                if (prob > 0.001) markerColor = 0xff4757;
+                else if (prob > 0.0001) markerColor = 0xffa726;
+
+                const markerMaterial = new THREE.MeshBasicMaterial({ color: markerColor });
+                const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+                
+                marker.position.set(x, y, z);
+                globe.scene.add(marker);
+            });
+        }
+
+        // Select a specific conjunction
+        function selectConjunction(conjunction, index) {
+            selectedConjunction = conjunction;
+            
+            // Highlight in list
+            document.querySelectorAll('.conjunction-item').forEach((item, i) => {
+                if (i === index) {
+                    item.style.background = 'rgba(33, 150, 243, 0.3)';
+                } else {
+                    item.style.background = 'rgba(255, 255, 255, 0.05)';
+                }
+            });
+
+            // Center map on conjunction
+            if (currentView === 'map') {
+                const coords = conjunction.geometry.coordinates;
+                map.setView([coords[1], coords[0]], 6);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', applyFilters);
+        
+        document.querySelectorAll('.risk-button').forEach(button => {
+            button.addEventListener('click', (e) => {
+                document.querySelectorAll('.risk-button').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                applyFilters();
+            });
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (map) {
+                map.invalidateSize();
+            }
+            if (globe && currentView === 'globe') {
+                const container = globe.container;
+                globe.camera.aspect = container.clientWidth / container.clientHeight;
+                globe.camera.updateProjectionMatrix();
+                globe.renderer.setSize(container.clientWidth, container.clientHeight);
+            }
+        });
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            loadConjunctionData();
+        });
+    </script>
+</body>
+</html>
