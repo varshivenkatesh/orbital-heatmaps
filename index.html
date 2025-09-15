@@ -621,78 +621,90 @@
                 }
             },
             sgi: {
-                title: '🌍 SGI Data',
-                searchFields: ['name', 'object_id', 'country', 'owner'],
+                searchFields: ['id', 'object_name', 'satellite_name', 'name', 'source', 'state', 'classification'],
                 filters: [
                     { key: 'all', label: 'All', active: true },
-                    { key: 'us', label: 'US' },
-                    { key: 'russia', label: 'Russia' },
-                    { key: 'china', label: 'China' },
-                    { key: 'other', label: 'Other' }
+                    { key: 'active', label: 'Active' },
+                    { key: 'predicted', label: 'Predicted' },
+                    { key: 'agi', label: 'AGI Source' },
+                    { key: 'high-solar', label: 'High Solar Activity' }
                 ],
                 getMarkerStyle: (item) => {
-                    const country = item.properties.country?.toLowerCase() || '';
-                    if (country.includes('us') || country.includes('united states')) return { color: '#2196f3', radius: 7, class: 'us-satellite' };
-                    if (country.includes('russia') || country.includes('cis')) return { color: '#f44336', radius: 7, class: 'russia-satellite' };
-                    if (country.includes('china')) return { color: '#ff9800', radius: 7, class: 'china-satellite' };
-                    return { color: '#4caf50', radius: 6, class: 'other-satellite' };
+                    const state = item.properties.state;
+                    const f10 = item.properties.f10 || 0;
+                    if (state === 'A') return { color: '#4caf50', radius: 8, class: 'active-sgi' };
+                    if (state === 'P') return { color: '#ff9800', radius: 6, class: 'predicted-sgi' };
+                    if (f10 > 200) return { color: '#f44336', radius: 10, class: 'high-solar' };
+                    return { color: '#9e9e9e', radius: 5, class: 'default-sgi' };
                 },
                 getStats: (data) => {
-                    let us = 0, russia = 0, china = 0, other = 0;
+                    let active = 0, predicted = 0, highSolar = 0;
                     data.forEach(item => {
-                        const country = item.properties.country?.toLowerCase() || '';
-                        if (country.includes('us') || country.includes('united states')) us++;
-                        else if (country.includes('russia') || country.includes('cis')) russia++;
-                        else if (country.includes('china')) china++;
-                        else other++;
+                        const state = item.properties.state;
+                        const f10 = item.properties.f10 || 0;
+                        if (state === 'A') active++;
+                        if (state === 'P') predicted++;
+                        if (f10 > 200) highSolar++;
                     });
                     return [
-                        { label: 'US', value: us },
-                        { label: 'Russia', value: russia },
-                        { label: 'China', value: china },
-                        { label: 'Other', value: other }
+                        { label: 'Active', value: active },
+                        { label: 'Predicted', value: predicted },
+                        { label: 'High Solar Activity', value: highSolar }
                     ];
                 },
                 filterFunction: (item, filterKey, searchTerm) => {
                     const props = item.properties;
-                    const country = props.country?.toLowerCase() || '';
                     
                     const searchMatch = !searchTerm || 
+                        props.id?.toLowerCase().includes(searchTerm) ||
+                        props.object_name?.toLowerCase().includes(searchTerm) ||
+                        props.satellite_name?.toLowerCase().includes(searchTerm) ||
                         props.name?.toLowerCase().includes(searchTerm) ||
-                        props.object_id?.toLowerCase().includes(searchTerm) ||
-                        props.country?.toLowerCase().includes(searchTerm) ||
-                        props.owner?.toLowerCase().includes(searchTerm);
+                        props.source?.toLowerCase().includes(searchTerm) ||
+                        props.state?.toLowerCase().includes(searchTerm) ||
+                        props.classification?.toLowerCase().includes(searchTerm);
                     
                     let filterMatch = true;
-                    if (filterKey === 'us') filterMatch = country.includes('us') || country.includes('united states');
-                    else if (filterKey === 'russia') filterMatch = country.includes('russia') || country.includes('cis');
-                    else if (filterKey === 'china') filterMatch = country.includes('china');
-                    else if (filterKey === 'other') filterMatch = !country.includes('us') && !country.includes('united states') && 
-                                                                   !country.includes('russia') && !country.includes('cis') && 
-                                                                   !country.includes('china');
+                    if (filterKey === 'active') filterMatch = props.state === 'A';
+                    else if (filterKey === 'predicted') filterMatch = props.state === 'P';
+                    else if (filterKey === 'agi') filterMatch = props.source === 'AGI';
+                    else if (filterKey === 'high-solar') filterMatch = (props.f10 || 0) > 200;
                     
                     return searchMatch && filterMatch;
                 },
                 renderListItem: (item) => {
+                    const style = dataConfigs.sgi.getMarkerStyle(item);
+                    const displayName = item.properties.object_name || 
+                                      item.properties.satellite_name || 
+                                      item.properties.name || 
+                                      `SGI-${(item.properties.id || '').substring(0, 8)}` ||
+                                      'SGI Object';
                     return `
                         <div class="data-header">
-                            ${item.properties.name || 'Satellite'}
+                            ${displayName}
                         </div>
                         <div class="data-details">
-                            ID: ${item.properties.object_id || 'N/A'}<br>
-                            Country: ${item.properties.country || 'Unknown'}<br>
-                            Owner: ${item.properties.owner || 'Unknown'}
+                            Source: ${item.properties.source || 'N/A'}<br>
+                            State: ${item.properties.state || 'N/A'}<br>
+                            F10.7: ${item.properties.f10 || 'N/A'}
                         </div>
                     `;
                 },
                 getPopupContent: (item) => {
+                    const displayName = item.properties.object_name || 
+                                      item.properties.satellite_name || 
+                                      item.properties.name || 
+                                      `SGI-${(item.properties.id || '').substring(0, 8)}` ||
+                                      'SGI Object';
                     return `
                         <div class="tooltip">
-                            <strong>${item.properties.name || 'Satellite'}</strong><br>
-                            <strong>ID:</strong> ${item.properties.object_id || 'N/A'}<br>
-                            <strong>Country:</strong> ${item.properties.country || 'Unknown'}<br>
-                            <strong>Owner:</strong> ${item.properties.owner || 'Unknown'}<br>
-                            <strong>Launch Date:</strong> ${item.properties.launch_date ? new Date(item.properties.launch_date).toLocaleDateString() : 'N/A'}
+                            <strong>${displayName}</strong><br>
+                            <strong>ID:</strong> ${(item.properties.id || '').substring(0, 8)}...<br>
+                            <strong>Source:</strong> ${item.properties.source || 'N/A'}<br>
+                            <strong>State:</strong> ${item.properties.state || 'N/A'}<br>
+                            <strong>Classification:</strong> ${item.properties.classification || 'N/A'}<br>
+                            <strong>F10.7:</strong> ${item.properties.f10 || 'N/A'}<br>
+                            <strong>Epoch:</strong> ${item.properties.epoch ? new Date(item.properties.epoch).toLocaleString() : 'N/A'}
                         </div>
                     `;
                 }
@@ -773,76 +785,6 @@
                 }
             }
         };
-
-        // Sample data generators for demonstration
-        function generateSampleData(type, count = 250) {
-            const data = [];
-            
-            for (let i = 0; i < count; i++) {
-                const lat = (Math.random() - 0.5) * 180;
-                const lng = (Math.random() - 0.5) * 360;
-                const alt = Math.random() * 40000;
-                
-                let item = {
-                    type: 'Feature',
-                    geometry: {
-                        type: 'Point',
-                        coordinates: [lng, lat, alt * 1000] // altitude in meters
-                    },
-                    properties: {}
-                };
-                
-                switch (type) {
-                    case 'conjunctions':
-                        item.properties = {
-                            name: `Conjunction ${1000 + i}-${2000 + i}`,
-                            tca: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
-                            collision_probability: Math.random() * 0.01,
-                            satellite1_id: `${1000 + i}`,
-                            satellite2_id: `${2000 + i}`,
-                            altitude_km: Math.floor(alt)
-                        };
-                        break;
-                        
-                    case 'elset':
-                        item.properties = {
-                            name: `Satellite ${1000 + i}`,
-                            satellite_id: `${1000 + i}`,
-                            object_name: `SATELLITE-${i}`,
-                            status: Math.random() > 0.3 ? 'active' : 'inactive',
-                            epoch: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000).toISOString(),
-                            mean_motion: (Math.random() * 16).toFixed(2)
-                        };
-                        break;
-                        
-                    case 'sgi':
-                        const countries = ['United States', 'Russia', 'China', 'France', 'Japan', 'India', 'Germany'];
-                        const country = countries[Math.floor(Math.random() * countries.length)];
-                        item.properties = {
-                            name: `SGI-SAT-${1000 + i}`,
-                            object_id: `${10000 + i}`,
-                            country: country,
-                            owner: country === 'United States' ? 'NASA/USAF' : country,
-                            launch_date: new Date(Date.now() - Math.random() * 10 * 365 * 24 * 60 * 60 * 1000).toISOString()
-                        };
-                        break;
-                        
-                    case 'statevector':
-                        item.properties = {
-                            name: `StateVector-${1000 + i}`,
-                            satellite_id: `${1000 + i}`,
-                            epoch: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-                            altitude_km: Math.floor(alt),
-                            velocity_kms: (Math.random() * 15 + 5).toFixed(2)
-                        };
-                        break;
-                }
-                
-                data.push(item);
-            }
-            
-            return data;
-        }
 
         // Initialize application
         function initApp() {
@@ -1056,7 +998,7 @@
                 .catch(() => {
                     // Use sample data if file doesn't exist or is invalid
                     console.log(`Using sample data for ${pageType}`);
-                    dataStore[pageType] = generateSampleData(pageType);
+                    // dataStore[pageType] = generateSampleData(pageType);
                 })
                 .finally(() => {
                     hideLoading();
