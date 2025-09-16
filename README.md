@@ -42,6 +42,10 @@ The project extracts **Unified Data Library (UDL) bulk data** and **Space-Track.
 
 ---
 
+<img width="2000" height="600" alt="pipeline" src="https://github.com/user-attachments/assets/20370625-adc9-42ce-918d-b4809e8ec97b" />
+
+---
+
 ## 🌐 Live Site
 🔗 [Space Traffic Navigation Website](https://varshivenkatesh.github.io/space-traffic-nav/)
 
