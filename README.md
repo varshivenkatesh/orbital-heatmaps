@@ -2,8 +2,8 @@
 
 [![Live Demo](https://img.shields.io/badge/Live_Site-Click_Here-brightgreen)](https://varshivenkatesh.github.io/space-traffic-nav/)
 
-An interactive platform for **satellite traffic visualization and analytics**.  
-The project extracts **Unified Data Library (UDL) bulk data** and **Space-Track.org JSON data**, processes and maps them into **GeoJSON**, and visualizes satellite traffic in **2D maps** and **3D globes** with advanced analytics through **Google Looker Studio**.
+An interactive platform for **satellite traffic visualization and analytics**. Initially developed during **Women in Data - Space Aware Datathon 2025**.
+I reimplemented this project end-to-end individually - this extracts **Unified Data Library (UDL) bulk data** and **Space-Track.org JSON data**, processes and maps them into **GeoJSON**, and visualizes satellite traffic in **2D maps** and **3D globes** with advanced analytics through **Google Looker Studio**.
 
 ---
 
@@ -33,7 +33,7 @@ The project extracts **Unified Data Library (UDL) bulk data** and **Space-Track.
 ---
 
 ## Tech Stack
-- **Backend / Data Processing**: Google Colab, Python, Pandas  
+- **Data Processing**: Google Colab, Python, Pandas  
 - **Storage & Analytics**: Google BigQuery, Looker Studio  
 - **Frontend Visualization**:  
   - [Leaflet.js](https://leafletjs.com/) → 2D mapping  
