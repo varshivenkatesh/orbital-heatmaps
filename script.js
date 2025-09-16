@@ -513,7 +513,7 @@
             showLoading(`Loading ${dataConfigs[pageType].title}...`);
             
             // Try to fetch real data first
-            const fileName = `${pageType}_recent.geojson`;
+            const fileName = `${pageType}.geojson`;
             
             fetch(fileName)
                 .then(response => {
@@ -918,4 +918,5 @@
         // Initialize the application when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
             initApp();
+
         });
